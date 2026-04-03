@@ -1,48 +1,86 @@
 <#
 .SYNOPSIS
-    Claude Code Enterprise Setup Script for 20 Teams.
-    Powered by Senior Developer Infrastructure.
+    Claude Code Enterprise Setup Script (Optimized)
+.DESCRIPTION
+    Configures AWS SSO, sets persistent environment variables, and verifies connectivity.
 #>
 
 $ErrorActionPreference = "Stop"
 Clear-Host
 
-Write-Host "====================================================" -ForegroundColor Cyan
-Write-Host "   CLAUDE CODE ENTERPRISE SETUP - 20 TEAMS CONFIG   " -ForegroundColor Cyan
-Write-Host "====================================================`n" -ForegroundColor Cyan
-
-# ១. ឱ្យបុគ្គលិកជ្រើសរើសក្រុម (Team Selection)
-Write-Host "Please select your Team Number (01 to 20):" -ForegroundColor Yellow
-$teamId = Read-Host "Team ID"
-
-if ($teamId -lt 1 -or $teamId -gt 20) {
-    Write-Host "Invalid Team ID! Please enter between 01 and 20." -ForegroundColor Red
-    exit
+# --- Configuration ---
+$CONFIG = @{
+    ProfileName = "bedrock"
+    SSOUrl      = "https://d-90660621fe.awsapps.com/start"
+    SSORegion   = "us-east-1"
+    AccountID   = "351381968895"
+    RoleName    = "BedrockTeamBackend"
+    ModelARN    = "arn:aws:bedrock:us-east-1:351381968895:application-inference-profile/ajux17znqgnb"
 }
 
-# ២. កំណត់ Configuration តាមក្រុម
-$region = "ap-southeast-1"
-$modelARN = "arn:aws:bedrock:ap-southeast-1:351381968895:application-inference-profile/team-$teamId"
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "   Claude Code Enterprise Setup        " -ForegroundColor Cyan
+Write-Host "========================================="
 
 try {
-    Write-Host "`n[1/3] Configuring Environment Variables..." -ForegroundColor White
-    [System.Environment]::SetEnvironmentVariable('CLAUDE_CODE_PROVIDER', 'bedrock', 'User')
-    [System.Environment]::SetEnvironmentVariable('AWS_REGION', $region, 'User')
-    [System.Environment]::SetEnvironmentVariable('CLAUDE_CODE_MODEL', $modelARN, 'User')
+    # 1. AWS SSO Configuration
+    Write-Host "`n[1/5] Configuring AWS SSO profile [$($CONFIG.ProfileName)]..." -ForegroundColor White
+    $ConfigMap = @{
+        "sso_start_url"  = $CONFIG.SSOUrl
+        "sso_region"     = $CONFIG.SSORegion
+        "sso_account_id" = $CONFIG.AccountID
+        "sso_role_name"  = $CONFIG.RoleName
+        "region"         = $CONFIG.SSORegion
+        "output"         = "json"
+    }
 
-    Write-Host "[2/3] Updating Execution Policy..." -ForegroundColor White
+    foreach ($Key in $ConfigMap.Keys) {
+        aws configure set $Key $($ConfigMap[$Key]) --profile $($CONFIG.ProfileName)
+    }
+
+    # 2. Environment Variables (Persistent + Current Session)
+    Write-Host "[2/5] Setting User Environment Variables..." -ForegroundColor White
+    $EnvVars = @{
+        "AWS_PROFILE"                    = $CONFIG.ProfileName
+        "AWS_REGION"                     = $CONFIG.SSORegion
+        "CLAUDE_CODE_USE_BEDROCK"        = "1"
+        "ANTHROPIC_DEFAULT_SONNET_MODEL" = $CONFIG.ModelARN
+    }
+
+    foreach ($Var in $EnvVars.Keys) {
+        # Permanent change for future windows
+        [System.Environment]::SetEnvironmentVariable($Var, $EnvVars[$Var], 'User')
+        # Immediate change for this window
+        Set-Item -Path "Env:\$Var" -Value $EnvVars[$Var]
+    }
+
+    # 3. Policy Update
+    Write-Host "[3/5] Updating Execution Policy..." -ForegroundColor White
     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 
-    Write-Host "[3/3] Finalizing Setup..." -ForegroundColor White
-    # បង្កើត Alias សម្រាប់ងាយស្រួលប្រើ (Optional)
-    if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Type File -Force }
-    
-    Write-Host "`n✅ SETUP SUCCESSFUL!" -ForegroundColor Green
-    Write-Host "----------------------------------------------------"
-    Write-Host "Team: Team-$teamId"
-    Write-Host "Model: Claude 3.5 Sonnet (via Bedrock)"
-    Write-Host "----------------------------------------------------"
-    Write-Host "`nACTION REQUIRED: Please RESTART your PowerShell/VS Code terminal." -ForegroundColor Cyan
+    # 4. AWS Authentication
+    Write-Host "[4/5] Logging in to AWS SSO..." -ForegroundColor White
+    aws sso login --profile $($CONFIG.ProfileName)
+	
+	# 5. Verification
+    Write-Host "[5/5] Verifying identity..." -ForegroundColor White
+    try {
+        $Identity = aws sts get-caller-identity --profile $($CONFIG.ProfileName) | ConvertFrom-Json
+        Write-Host "`n✅ SETUP SUCCESSFUL!" -ForegroundColor Green
+        Write-Host "-----------------------------------------"
+        Write-Host "User ID  : $($Identity.UserId)"
+        Write-Host "Account  : $($Identity.Account)"
+        Write-Host "Profile  : $($CONFIG.ProfileName)"
+        Write-Host "-----------------------------------------"
+		Write-Host "`nNEXT STEPS:" -ForegroundColor Cyan
+		Write-Host "1. Restart VS Code (to reload global Env Vars)"
+		Write-Host "2. Run: claude"
+    }
+    catch {
+        Write-Host "`n❌ LOGIN FAILED: You do not have access to the role '$($CONFIG.RoleName)' in account $($CONFIG.AccountID)." -ForegroundColor Red
+        Write-Host "Please check the RoleName in your SSO Portal." -ForegroundColor Yellow
+        exit
+    }
 }
 catch {
     Write-Host "`n❌ Error: $($_.Exception.Message)" -ForegroundColor Red
