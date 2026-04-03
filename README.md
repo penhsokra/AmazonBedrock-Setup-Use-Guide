@@ -5,9 +5,9 @@
 ## 🛠️ ការរៀបចំដំបូង (First-time Setup)
 
 1. **ដំឡើង AWS CLI:** ប្រាកដថាអ្នកមាន [AWS CLI](https://aws.amazon.com/cli/) រួចរាល់។
-2. window install claude cli : irm https://claude.ai/install.ps1 | iex
-3. **ដំឡើង Node.js:** ត្រូវការ Version 18 ឡើងទៅ។
-4. **Run Setup Script:** - ទាញយក `setup-claude-enterprise.ps1`។
+2. window install claude cli : ```powershell irm https://claude.ai/install.ps1 | iex ```
+5. **ដំឡើង Node.js:** ត្រូវការ Version 18 ឡើងទៅ។
+6. **Run Setup Script:** - ទាញយក `setup-claude-enterprise.ps1`។
    - Right-click រួចជ្រើសរើស **"Run with PowerShell"**។
    - បញ្ចូលលេខក្រុមរបស់អ្នក (ឧទាហរណ៍: `05`)។
 
