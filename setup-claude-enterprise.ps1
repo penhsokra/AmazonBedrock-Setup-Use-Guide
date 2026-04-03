@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Claude Code Enterprise Setup Script (Optimized)
+    Claude Code Enterprise Setup Script (Final)
 .DESCRIPTION
-    Configures AWS SSO, sets persistent environment variables, and verifies connectivity.
+    Configures AWS SSO, sets persistent environment variables for the Backend Team, and verifies connectivity.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +15,8 @@ $CONFIG = @{
     SSORegion   = "us-east-1"
     AccountID   = "351381968895"
     RoleName    = "BedrockTeamBackend"
-    ModelARN    = "arn:aws:bedrock:us-east-1:351381968895:application-inference-profile/ajux17znqgnb"
+    # Updated to the specific Backend Team Inference Profile found in your console
+    ModelARN    = "arn:aws:bedrock:us-east-1:351381968895:application-inference-profile/aibid7fhapm8"
 }
 
 Write-Host "=========================================" -ForegroundColor Cyan
@@ -48,9 +49,7 @@ try {
     }
 
     foreach ($Var in $EnvVars.Keys) {
-        # Permanent change for future windows
         [System.Environment]::SetEnvironmentVariable($Var, $EnvVars[$Var], 'User')
-        # Immediate change for this window
         Set-Item -Path "Env:\$Var" -Value $EnvVars[$Var]
     }
 
@@ -61,24 +60,27 @@ try {
     # 4. AWS Authentication
     Write-Host "[4/5] Logging in to AWS SSO..." -ForegroundColor White
     aws sso login --profile $($CONFIG.ProfileName)
-	
-	# 5. Verification
+    
+    # 5. Verification
     Write-Host "[5/5] Verifying identity..." -ForegroundColor White
     try {
-        $Identity = aws sts get-caller-identity --profile $($CONFIG.ProfileName) | ConvertFrom-Json
+        $IdentityJson = aws sts get-caller-identity --profile $($CONFIG.ProfileName)
+        $Identity = $IdentityJson | ConvertFrom-Json
+        
         Write-Host "`n✅ SETUP SUCCESSFUL!" -ForegroundColor Green
         Write-Host "-----------------------------------------"
         Write-Host "User ID  : $($Identity.UserId)"
         Write-Host "Account  : $($Identity.Account)"
         Write-Host "Profile  : $($CONFIG.ProfileName)"
+        Write-Host "Model ARN: $($CONFIG.ModelARN)"
         Write-Host "-----------------------------------------"
-		Write-Host "`nNEXT STEPS:" -ForegroundColor Cyan
-		Write-Host "1. Restart VS Code (to reload global Env Vars)"
-		Write-Host "2. Run: claude"
+        Write-Host "`nNEXT STEPS:" -ForegroundColor Cyan
+        Write-Host "1. Restart VS Code (to reload global Env Vars)"
+        Write-Host "2. Run: claude"
     }
     catch {
         Write-Host "`n❌ LOGIN FAILED: You do not have access to the role '$($CONFIG.RoleName)' in account $($CONFIG.AccountID)." -ForegroundColor Red
-        Write-Host "Please check the RoleName in your SSO Portal." -ForegroundColor Yellow
+        Write-Host "Check your AWS SSO portal to ensure the RoleName is correct." -ForegroundColor Yellow
         exit
     }
 }
